@@ -1,0 +1,9 @@
+host: localhost
+port: 85
+hooks:
+    Test: http://vmtoolxz.smals.scloud.be/hooks/ejq1wjxh5i87jr9e1s5ki3t8to
+metrics: true
+debug: true
+dumpdir: dump
+mmicon: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Puppeter_template.svg/40px-Puppeter_template.svg.png"
+mmuser: "JIRA"

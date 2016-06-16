@@ -1,0 +1,8 @@
+package: git01.smals.be/mmjiraserver
+import:
+- package: github.com/antonholmquist/jason
+  subpackages:
+  - github.com\antonholmquist\jason
+- package: github.com/gorilla/mux
+  subpackages:
+  - github.com\gorilla\mux
