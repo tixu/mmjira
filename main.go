@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -13,14 +14,21 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/antonholmquist/jason"
+	metrics "github.com/armon/go-metrics"
 	"github.com/go-yaml/yaml"
 	"github.com/gorilla/mux"
+	"github.com/pkg/profile"
 )
 
 // Config is shared accross all the application
-var Config instanceConfig
+var (
+	Config        instanceConfig
+	hitsperminute = expvar.NewInt("hits_per_minute")
+	inm           = metrics.NewInmemSink(10*time.Millisecond, 50*time.Millisecond)
+)
 
 const tmpl = `@channel
 # JIRA {{.ID}}
@@ -44,6 +52,16 @@ type Mmrequest struct {
 	Text string `json:"text"`
 }
 
+//MMresponse is the response from MM
+type MMresponse struct {
+	Project    string `json:"project"`
+	EndPoint   string `json:"endpoint"`
+	ID         string `json:"jiraid"`
+	Status     string `json:"status"`
+	StatusCode int    `json:"statuscode"`
+	Error      string `json:"error"`
+}
+
 type issueUpdate struct {
 	Event   string
 	User    string
@@ -64,6 +82,7 @@ type instanceConfig struct {
 	Hooks   map[string]string
 	MMicon  string
 	MMuser  string
+	Profile string
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +92,12 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 func getHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "<h1>MatterBridge Handler</h1><div>Go bridge : get handler</div>")
+	data := inm.Data()
+
+	intvM := data[0]
+	intvM.RLock()
+	log.Printf("%+v", inm)
+	intvM.RUnlock()
 }
 
 // MMController is repsonsible to handle the communication towards MM
@@ -114,35 +139,64 @@ func (c *MMController) GetTarget(project string) (response string, err error) {
 	return response, err
 }
 
+//Analyse the response from mm
+func (c *MMController) Analyse(in <-chan MMresponse) {
+
+	response := <-in
+	log.Printf("%+v", response)
+	inm.IncrCounter([]string{strconv.Itoa(response.StatusCode), response.Project, response.ID}, 1)
+}
+
 //Inform send message to the right channel in MM
-func (c *MMController) Inform(update issueUpdate) error {
+func (c *MMController) Inform(update issueUpdate) <-chan MMresponse {
+	ch := make(chan MMresponse)
+	go func() {
+		response := MMresponse{Project: update.Project, ID: update.ID}
+		purl, err := c.GetTarget(update.Project)
+		if err != nil {
+			response.Error = err.Error()
+			response.Status = "1002 - not mapped"
+			response.StatusCode = 1002
+			ch <- response
+			return
+		}
+		log.Printf("about to post %s", purl)
+		buff := bytes.NewBufferString("")
+		c.mmtemplate.Execute(buff, update)
 
-	purl, err := c.GetTarget(update.Project)
-	if err != nil {
-		return err
-	}
-	log.Printf("about to post %s", purl)
-	buff := bytes.NewBufferString("")
-	c.mmtemplate.Execute(buff, update)
+		s2, _ := json.Marshal(&Mmrequest{User: c.name, Icon: c.icon, Text: string(buff.Bytes())})
 
-	s2, _ := json.Marshal(&Mmrequest{User: c.name, Icon: c.icon, Text: string(buff.Bytes())})
+		req, err := http.NewRequest("POST", purl, bytes.NewBuffer(s2))
 
-	req, err := http.NewRequest("POST", purl, bytes.NewBuffer(s2))
+		req.Header.Set("Content-Type", "application/json")
 
-	req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return (err)
-	}
-	defer resp.Body.Close()
+		resp, err := client.Do(req)
 
-	return nil
+		if err != nil {
+			response.Error = err.Error()
+			response.EndPoint = purl
+			response.Error = err.Error()
+			response.Status = resp.Status
+			response.StatusCode = resp.StatusCode
+			ch <- response
+			return
+		}
+		response.Error = ""
+		response.EndPoint = purl
+		response.Status = resp.Status
+		response.StatusCode = resp.StatusCode
+
+		ch <- response
+	}()
+	return ch
 }
 
 func postHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("received a request")
+
+	inm.IncrCounter([]string{"request", "jira"}, 1)
 	dump, err := httputil.DumpRequest(r, true)
 
 	if err != nil {
@@ -177,6 +231,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
 		return
 	}
+	inm.IncrCounter([]string{pname, id}, 1)
 
 	changes := make(map[string]string)
 	for _, item := range items {
@@ -188,7 +243,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	// We only know our top-level keys are strings
 
 	log.Printf("%+v", issue)
-	go mmpost.Inform(issue)
+	go mmpost.Analyse(mmpost.Inform(issue))
 
 }
 
@@ -207,6 +262,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	switch Config.Profile {
+	case "cpu":
+		defer profile.Start(profile.ProfilePath("."), profile.CPUProfile).Stop()
+	case "mem":
+		defer profile.Start(profile.ProfilePath("."), profile.MemProfile).Stop()
+	case "block":
+		defer profile.Start(profile.ProfilePath("."), profile.BlockProfile).Stop()
+	default:
+		// do nothing
+	}
+
 	log.Printf("config : %+v", Config)
 	r.HandleFunc("/", homeHandler)
 	r.HandleFunc("/hooks/", getHandler).Methods("GET")
@@ -225,6 +292,7 @@ func (c *instanceConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 		DumpDir  string            `yaml:"dumpdir"`
 		MMuser   string            `yaml:"mmuser"`
 		MMIcon   string            `yaml:"mmicon"`
+		Profile  string            `yaml:"profile"`
 	}
 	log.Println("validating config")
 	if err := unmarshal(&aux); err != nil {
@@ -261,7 +329,7 @@ func (c *instanceConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	c.DumpDir = aux.DumpDir
 	c.MMicon = aux.MMIcon
 	c.MMuser = aux.MMuser
-
+	c.Profile = aux.Profile
 	log.Println("config validated")
 	return nil
 }

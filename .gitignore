@@ -25,3 +25,5 @@ _testmain.go
 
 # specific to my program
 dump
+*.pprof
+*.pdf
