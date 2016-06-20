@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/tixu/mmjiraserver/jira"
+	"github.com/tixu/mmjira/jira"
 )
 
 // Mmrequest is the message that will be send to mm

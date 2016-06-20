@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/tixu/mmjiraserver/jira"
-	"github.com/tixu/mmjiraserver/mmcontroller"
-	"github.com/tixu/mmjiraserver/utils"
+	"github.com/tixu/mmjira/jira"
+	"github.com/tixu/mmjira/mmcontroller"
+	"github.com/tixu/mmjira/utils"
 
 	"net/http"
 	"strconv"
