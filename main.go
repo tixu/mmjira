@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -185,22 +184,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("received a request")
 
 	inm.IncrCounter([]string{"request", "jira"}, 1)
-	dump, err := httputil.DumpRequest(r, true)
-
-	if err != nil {
-		http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
-		return
-	}
 	if Config.Debug {
-		var tmpfile *os.File
-		tmpfile, err = ioutil.TempFile(Config.DumpDir, "example")
-		if err != nil {
-			log.Fatal(err)
+		if err := dumpRequest(r); err != nil {
+			http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
 		}
-		tmpfile.Write(dump)
-		tmpfile.Close()
 	}
-
 	v, err := jason.NewObjectFromReader(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
@@ -235,6 +223,25 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func dumpRequest(r *http.Request) (err error) {
+
+	dump, err := httputil.DumpRequest(r, true)
+
+	if err != nil {
+		return err
+	}
+	if Config.Debug {
+
+		tmpfile, err := ioutil.TempFile(Config.DumpDir, "example")
+		if err != nil {
+			return err
+		}
+		tmpfile.Write(dump)
+		tmpfile.Close()
+	}
+	return nil
+}
+
 func main() {
 
 	r := mux.NewRouter()
@@ -250,7 +257,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
+	// activating
 	switch Config.Profile {
 	case "cpu":
 		defer profile.Start(profile.ProfilePath("."), profile.CPUProfile).Stop()
