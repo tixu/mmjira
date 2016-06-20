@@ -9,29 +9,31 @@ import (
 
 //InstanceConfig is used to configure the bridge.
 type InstanceConfig struct {
-	Host    string
-	Port    int
-	Metrics bool
-	Debug   bool
-	DumpDir string
-	Hooks   map[string]string
-	MMicon  string
-	MMuser  string
-	Profile string
+	Host       string
+	Port       int
+	Metrics    bool
+	Debug      bool
+	DumpDir    string
+	Hooks      map[string]string
+	MMicon     string
+	MMuser     string
+	Profile    string
+	ProfileDir string
 }
 
 // UnmarshalYAML parse the configuration file.
 func (c *InstanceConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var aux struct {
-		Hostname string            `yaml:"host"`
-		Port     string            `yaml:"port"`
-		Metrics  string            `yaml:"metrics"`
-		Debug    string            `yaml:"debug"`
-		Hooks    map[string]string `yaml:"hooks"`
-		DumpDir  string            `yaml:"dumpdir"`
-		MMuser   string            `yaml:"mmuser"`
-		MMIcon   string            `yaml:"mmicon"`
-		Profile  string            `yaml:"profile"`
+		Hostname   string            `yaml:"host"`
+		Port       string            `yaml:"port"`
+		Metrics    string            `yaml:"metrics"`
+		Debug      string            `yaml:"debug"`
+		Hooks      map[string]string `yaml:"hooks"`
+		DumpDir    string            `yaml:"dumpdir"`
+		MMuser     string            `yaml:"mmuser"`
+		MMIcon     string            `yaml:"mmicon"`
+		Profile    string            `yaml:"profile"`
+		ProfileDir string            `yaml:"profiledir"`
 	}
 	log.Println("validating config")
 	if err := unmarshal(&aux); err != nil {
@@ -69,6 +71,7 @@ func (c *InstanceConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	c.MMicon = aux.MMIcon
 	c.MMuser = aux.MMuser
 	c.Profile = aux.Profile
+	c.ProfileDir = aux.ProfileDir
 	log.Println("config validated")
 	return nil
 }

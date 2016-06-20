@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"strconv"
 	"strings"
 	"time"
@@ -60,6 +59,8 @@ type MMresponse struct {
 	StatusCode int    `json:"statuscode"`
 	Error      string `json:"error"`
 }
+
+// issueUpdate represent the event we revceived from the JIra Incoming webhook
 
 type issueUpdate struct {
 	Event   string
@@ -221,25 +222,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%+v", issue)
 	go mmpost.Analyse(mmpost.Inform(issue))
 
-}
-
-func dumpRequest(r *http.Request) (err error) {
-
-	dump, err := httputil.DumpRequest(r, true)
-
-	if err != nil {
-		return err
-	}
-	if Config.Debug {
-
-		tmpfile, err := ioutil.TempFile(Config.DumpDir, "example")
-		if err != nil {
-			return err
-		}
-		tmpfile.Write(dump)
-		tmpfile.Close()
-	}
-	return nil
 }
 
 func main() {

@@ -8,3 +8,4 @@ dumpdir: dump
 mmicon: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Puppeter_template.svg/40px-Puppeter_template.svg.png"
 mmuser: "JIRA"
 profile: "cpu"
+profiledir: "."
