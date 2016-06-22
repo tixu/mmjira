@@ -1,4 +1,4 @@
-package: git01.smals.be/mmjiraserver
+package: github.com/tixu/mmjiraserver
 import:
 - package: github.com/antonholmquist/jason
   subpackages:

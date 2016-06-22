@@ -1,0 +1,28 @@
+hash: 275125971ac27ddabdc2e6c46b211349d26061c7aaf0ae86c72695dc56d974fa
+updated: 2016-06-22T06:35:53.5851013+02:00
+imports:
+- name: github.com/antonholmquist/jason
+  version: 423803175a265e07c3f35cd8faf009eac345efb8
+  subpackages:
+  - github.com\antonholmquist\jason
+- name: github.com/armon/go-metrics
+  version: fbf75676ee9c0a3a23eb0a4d9220a3612cfbd1ed
+  subpackages:
+  - github.com\armon\go-metrics
+- name: github.com/go-yaml/yaml
+  version: a83829b6f1293c91addabc89d0571c246397bbf4
+  subpackages:
+  - github.com\go-yaml\yaml
+- name: github.com/gorilla/context
+  version: aed02d124ae4a0e94fea4541c8effd05bf0c8296
+  subpackages:
+  - github.com\gorilla\context
+- name: github.com/gorilla/mux
+  version: 9fa818a44c2bf1396a17f9d5a3c0f6dd39d2ff8e
+  subpackages:
+  - github.com\gorilla\mux
+- name: github.com/pkg/profile
+  version: 8a808a6967b79da66deacfe508b26d398a69518f
+  subpackages:
+  - github.com\pkg\profile
+devImports: []

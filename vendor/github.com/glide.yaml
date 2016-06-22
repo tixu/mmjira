@@ -1,0 +1,5 @@
+package: .
+import:
+- package: github.com/gorilla/context
+  subpackages:
+  - github.com\gorilla\context
