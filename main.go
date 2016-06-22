@@ -74,6 +74,7 @@ func (b MMJira) start(){
 }
 
 func newBot() (b MMJira){
+
   b = MMJira{l: zap.NewJSON(zap.DebugLevel)}
 	data, err := ioutil.ReadFile("config.yaml")
 	if err != nil {
@@ -84,8 +85,10 @@ func newBot() (b MMJira){
 		b.l.Panic("not able to marshal the file",zap.Error(err))
 	}
 	b.c= &config
-
-	mmpost, err := mmcontroller.NewController(b.c.MMicon, b.c.MMuser, b.c.Hooks)
+	if (!b.c.Debug){
+		b.l.SetLevel(zap.ErrorLevel)
+		}
+	mmpost, err := mmcontroller.NewController(b.c.MMicon, b.c.MMuser, b.c.Hooks,b.c.Debug)
 	if err != nil {
 		panic(err)
 	}

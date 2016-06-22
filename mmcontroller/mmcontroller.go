@@ -3,11 +3,11 @@ package mmcontroller
 import (
 	"bytes"
 	"encoding/json"
-	"log"
+	"github.com/tixu/mmjira/jira"
+	"github.com/uber-go/zap"
+
 	"net/http"
 	"strings"
-
-	"github.com/tixu/mmjira/jira"
 )
 
 // Mmrequest is the message that will be send to mm
@@ -29,17 +29,22 @@ type MMresponse struct {
 
 // MMController is repsonsible to handle the communication towards MM
 type MMController struct {
+	l     zap.Logger
 	icon  string
 	name  string
 	hooks map[string]string
 }
 
 // NewController is used to create a MMController
-func NewController(icon string, name string, hooks map[string]string) (m *MMController, err error) {
+func NewController(icon string, name string, hooks map[string]string, debug bool) (m *MMController, err error) {
 	m = new(MMController)
 	m.icon = icon
 	m.name = name
 	m.hooks = hooks
+	m.l = zap.NewJSON(zap.ErrorLevel)
+	if debug {
+		m.l.SetLevel(zap.DebugLevel)
+	}
 
 	return m, nil
 
@@ -57,7 +62,7 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 			ch <- response
 			return
 		}
-		log.Printf("about to post %s", purl)
+		c.l.Debug("about to post", zap.String("post url", purl))
 		buff, err := update.Render()
 		if err != nil {
 			response.Error = err.Error()
@@ -99,6 +104,6 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 func (c *MMController) Analyse(in <-chan MMresponse) {
 
 	response := <-in
-	log.Printf("%+v", response)
+	c.l.Info("response received", zap.Object("response", response))
 
 }
