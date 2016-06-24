@@ -59,7 +59,7 @@ func (c *InstanceConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	}
 	upperHooks := make(map[string]string)
 	for key, value := range aux.Hooks {
-		upperHooks[strings.ToUpper(key)] = value
+		upperHooks[strings.ToLower(key)] = value
 	}
 	c.Host = aux.Hostname
 	c.Port = port

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"github.com/tixu/mmjira/jira"
 	"github.com/uber-go/zap"
-
+	metrics "github.com/rcrowley/go-metrics"
 	"net/http"
 	"strings"
 )
@@ -33,10 +33,11 @@ type MMController struct {
 	icon  string
 	name  string
 	hooks map[string]string
+	reg metrics.Registry
 }
 
 // NewController is used to create a MMController
-func NewController(icon string, name string, hooks map[string]string, debug bool) (m *MMController, err error) {
+func NewController(icon string, name string, hooks map[string]string, debug bool, reg metrics.Registry) (m *MMController, err error) {
 	m = new(MMController)
 	m.icon = icon
 	m.name = name
@@ -45,16 +46,22 @@ func NewController(icon string, name string, hooks map[string]string, debug bool
 	if debug {
 		m.l.SetLevel(zap.DebugLevel)
 	}
-
+	m.reg = reg
 	return m, nil
 
 }
 
 //Inform send message to the right channel in MM
 func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
+	count:=metrics.GetOrRegisterCounter("inform.request.total",c.reg)
+	count.Inc(1)
+
 	ch := make(chan MMresponse)
 	go func() {
-		response := MMresponse{Project: update.Project, ID: update.ID}
+		response := MMresponse{Project: strings.ToLower(update.Project), ID: update.ID}
+		count:=metrics.GetOrRegisterCounter("inform.request."+response.Project,c.reg)
+		count.Inc(1)
+
 		purl := c.hooks[strings.ToUpper(update.Project)]
 		if purl == "" {
 			response.Status = "1002 - not mapped"
@@ -62,6 +69,7 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 			ch <- response
 			return
 		}
+		response.EndPoint = purl
 		c.l.Debug("about to post", zap.String("post url", purl))
 		buff, err := update.Render()
 		if err != nil {
@@ -84,18 +92,15 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 
 		if err != nil {
 			response.Error = err.Error()
-			response.EndPoint = purl
-			response.Error = err.Error()
-
 			ch <- response
 			return
 		}
 		response.Error = ""
-		response.EndPoint = purl
 		response.Status = resp.Status
 		response.StatusCode = resp.StatusCode
 
 		ch <- response
+		close(ch)
 	}()
 	return ch
 }
@@ -103,7 +108,19 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 //Analyse the response from mm
 func (c *MMController) Analyse(in <-chan MMresponse) {
 
+	count:=metrics.GetOrRegisterCounter("analyse.response.total",c.reg)
+	count.Inc(1)
+
 	response := <-in
+	if (response.StatusCode != 200){
+			n := "analyse.response."+response.Project+".error"
+			count:=metrics.GetOrRegisterCounter(n,c.reg)
+			count.Inc(1)
+	} else {
+		n := "analyse.response."+response.Project+".ok"
+		count:=metrics.GetOrRegisterCounter(n,c.reg)
+		count.Inc(1)
+	}
 	c.l.Info("response received", zap.Object("response", response))
 
 }

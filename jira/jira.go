@@ -5,7 +5,7 @@ import (
 	"html/template"
 	"io"
 	"log"
-
+  "strings"
 	"github.com/antonholmquist/jason"
 )
 
@@ -80,6 +80,6 @@ func New(reader io.Reader) (i IssueEvent, err error) {
 		changes[field] = value
 	}
 
-	i = IssueEvent{Event: event, User: user, Userurl: userurl, ID: id, URL: url, Summary: summary, Project: pname, Changes: changes}
+	i = IssueEvent{Event: event, User: user, Userurl: userurl, ID: id, URL: url, Summary: summary, Project: strings.ToLower(pname), Changes: changes}
 	return i, nil
 }

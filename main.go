@@ -2,22 +2,27 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"io/ioutil"
 	"github.com/uber-go/zap"
-
+	"html/template"
 	"github.com/tixu/mmjira/jira"
 	"github.com/tixu/mmjira/mmcontroller"
 	"github.com/tixu/mmjira/utils"
 
 	"net/http"
 	"strconv"
-
+	metrics "github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics/exp"
 	"github.com/go-yaml/yaml"
 	"github.com/gorilla/mux"
 )
 
-
-
+// Page is structuring information
+type Page struct {
+	T string
+	C map[string]int64
+}
 
 // MMJira is the heart of the bots
 type MMJira struct {
@@ -25,6 +30,7 @@ type MMJira struct {
 	m *mmcontroller.MMController
 	r *mux.Router
 	l zap.Logger
+	reg metrics.Registry
 }
 
 func (b MMJira) homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -33,14 +39,44 @@ func (b MMJira) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func (b MMJira) getHandler(w http.ResponseWriter, r *http.Request) {
 	b.l.Debug("got a request to the hetHandler")
-	fmt.Fprintf(w, "<h1>MatterBridge Handler</h1><div>Go bridge : get handler</div>")
+  //increasing the counter
+	c:=metrics.GetOrRegisterCounter("hooks.get", b.reg)
+	c.Inc(1)
+  // computing the map
+  cv  :=make(map[string]int64)
+	anom := func (k string, v interface{}) {
+		if tmp, ok :=v.(metrics.Counter); ok {
+			 cv[k]=tmp.Count()
+			}
+		}
+	b.reg.Each(anom)
+	//t:=template.New("info")
+	var err error
+	t, err := template.ParseFiles("templates/info.html")
+	if err !=nil {
+		http.Error(w, err.Error(),http.StatusInternalServerError)
+		return
+			}
+	p := Page{T:"Overview",C:cv}
+	if err := t.Execute(w, p);err !=nil {
+		http.Error(w, err.Error(),http.StatusInternalServerError)
+	}
 }
 
 
 // GetTarget retrieve the hook assigned to a projet, return an error in anyother case
 func (b MMJira) postHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	hookid := strings.ToLower(vars["hookid"])
+	if (b.c.Hooks[hookid] ==""){
+		  c:=metrics.GetOrRegisterCounter("hooks.post.unknown.project", b.reg)
+		  c.Inc(1)
+			http.Error(w, "unknwon project", http.StatusBadRequest)
+			return
+		}
 	b.l.Debug("received a request")
-
+	c:=metrics.GetOrRegisterCounter("hooks.received."+hookid, b.reg)
+	c.Inc(1)
 	if b.c.Debug {
 		if err := utils.DumpRequest(r, b.c.DumpDir); err != nil {
 			b.l.Info("unable to dump the request in the directory",zap.String("Directory",b.c.DumpDir))
@@ -68,14 +104,13 @@ func (b MMJira) postHandler(w http.ResponseWriter, r *http.Request) {
 
 func (b MMJira) start(){
 	http.Handle("/", b.r)
-
 	endpoint := b.c.Host + ":" + strconv.Itoa(b.c.Port)
 	b.l.Fatal("error server",zap.Error(http.ListenAndServe(endpoint, b.r)))
 }
 
 func newBot() (b MMJira){
 
-  b = MMJira{l: zap.NewJSON(zap.DebugLevel)}
+  b = MMJira{l: zap.NewJSON(zap.DebugLevel), reg : metrics.NewRegistry()}
 	data, err := ioutil.ReadFile("config.yaml")
 	if err != nil {
 		b.l.Panic("not able to read the file",zap.Error(err))
@@ -88,20 +123,20 @@ func newBot() (b MMJira){
 	if (!b.c.Debug){
 		b.l.SetLevel(zap.ErrorLevel)
 		}
-	mmpost, err := mmcontroller.NewController(b.c.MMicon, b.c.MMuser, b.c.Hooks,b.c.Debug)
+	mmpost, err := mmcontroller.NewController(b.c.MMicon,b.c.MMuser,b.c.Hooks,b.c.Debug,metrics.NewPrefixedChildRegistry(b.reg, "mmc."))
 	if err != nil {
 		panic(err)
 	}
 
 	b.m = mmpost
 	b.l.Debug("outputting config", zap.Object("config", b.c))
-
 	b.r = mux.NewRouter()
 	b.r.HandleFunc("/", b.homeHandler)
-
 	b.r.HandleFunc("/hooks/", b.getHandler).Methods("GET")
-	b.r.HandleFunc("/hooks/", b.postHandler).Methods("POST")
-  return b
+	b.r.HandleFunc("/hooks/{hookid}", b.postHandler).Methods("POST")
+	b.r.Handle("/metrics",exp.ExpHandler(b.reg))
+
+	return b
 
 }
 
