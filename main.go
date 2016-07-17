@@ -16,6 +16,7 @@ import (
 	"github.com/rcrowley/go-metrics/exp"
 	"github.com/go-yaml/yaml"
 	"github.com/gorilla/mux"
+	"github.com/fatih/structs"
 )
 
 // Page is structuring information
@@ -63,11 +64,30 @@ func (b MMJira) getHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (b MMJira) configGetHandler(w http.ResponseWriter, r *http.Request){
+  c:=structs.Map(b.c)
+	p :=struct {
+		T string
+		C map[string]interface{}
+	}{T:"Configuration",C:c }
 
+	t, err := template.ParseFiles("templates/config.html")
+	if err !=nil {
+		http.Error(w, err.Error(),http.StatusInternalServerError)
+		return
+			}
+
+	if err := t.Execute(w, p);err !=nil {
+		http.Error(w, err.Error(),http.StatusInternalServerError)
+	}
+
+
+}
 // GetTarget retrieve the hook assigned to a projet, return an error in anyother case
 func (b MMJira) postHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	hookid := strings.ToLower(vars["hookid"])
+	b.l.Info("project", zap.String("hook",hookid))
 	if (b.c.Hooks[hookid] ==""){
 		  c:=metrics.GetOrRegisterCounter("hooks.post.unknown.project", b.reg)
 		  c.Inc(1)
@@ -80,7 +100,6 @@ func (b MMJira) postHandler(w http.ResponseWriter, r *http.Request) {
 	if b.c.Debug {
 		if err := utils.DumpRequest(r, b.c.DumpDir); err != nil {
 			b.l.Info("unable to dump the request in the directory",zap.String("Directory",b.c.DumpDir))
-
 		}
 	}
 	issue, err := jira.New(r.Body)
@@ -135,6 +154,7 @@ func newBot() (b MMJira){
 	b.r.HandleFunc("/hooks/", b.getHandler).Methods("GET")
 	b.r.HandleFunc("/hooks/{hookid}", b.postHandler).Methods("POST")
 	b.r.Handle("/metrics",exp.ExpHandler(b.reg))
+	b.r.HandleFunc("/config/", b.configGetHandler).Methods("GET")
 
 	return b
 

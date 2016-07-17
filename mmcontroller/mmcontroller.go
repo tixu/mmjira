@@ -53,6 +53,8 @@ func NewController(icon string, name string, hooks map[string]string, debug bool
 
 //Inform send message to the right channel in MM
 func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
+
+	c.l.Info("about to inform")
 	count:=metrics.GetOrRegisterCounter("inform.request.total",c.reg)
 	count.Inc(1)
 
@@ -62,7 +64,7 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 		count:=metrics.GetOrRegisterCounter("inform.request."+response.Project,c.reg)
 		count.Inc(1)
 
-		purl := c.hooks[strings.ToUpper(update.Project)]
+		purl := c.hooks[strings.ToLower(update.Project)]
 		if purl == "" {
 			response.Status = "1002 - not mapped"
 			response.StatusCode = 1002

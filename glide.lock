@@ -1,16 +1,16 @@
 hash: 275125971ac27ddabdc2e6c46b211349d26061c7aaf0ae86c72695dc56d974fa
-updated: 2016-06-22T06:35:53.5851013+02:00
+updated: 2016-07-17T23:38:36.5459253+02:00
 imports:
 - name: github.com/antonholmquist/jason
   version: 423803175a265e07c3f35cd8faf009eac345efb8
   subpackages:
   - github.com\antonholmquist\jason
-- name: github.com/armon/go-metrics
-  version: fbf75676ee9c0a3a23eb0a4d9220a3612cfbd1ed
+- name: github.com/fatih/structs
+  version: be738c8546f55b34e60125afa50ed73a9a9c460e
   subpackages:
-  - github.com\armon\go-metrics
+  - github.com\fatih\structs
 - name: github.com/go-yaml/yaml
-  version: a83829b6f1293c91addabc89d0571c246397bbf4
+  version: e4d366fc3c7938e2958e662b4258c7a89e1f0e3e
   subpackages:
   - github.com\go-yaml\yaml
 - name: github.com/gorilla/context
@@ -22,7 +22,20 @@ imports:
   subpackages:
   - github.com\gorilla\mux
 - name: github.com/pkg/profile
-  version: 8a808a6967b79da66deacfe508b26d398a69518f
+  version: 7b053ad66e2a49baca9cc97b982dcea0e182bda4
   subpackages:
   - github.com\pkg\profile
+- name: github.com/rcrowley/go-metrics
+  version: cfa5a85e9f0abbdf1701b59082c36fc7bff10759
+  subpackages:
+  - github.com\rcrowley\go-metrics
+  - github.com\rcrowley\go-metrics\exp
+- name: github.com/uber-go/atomic
+  version: e682c1008ac17bf26d2e4b5ad6cdd08520ed0b22
+  subpackages:
+  - github.com\uber-go\atomic
+- name: github.com/uber-go/zap
+  version: 63d56df197a79e16899d69b6a7665cb9b7c8ea99
+  subpackages:
+  - github.com\uber-go\zap
 devImports: []

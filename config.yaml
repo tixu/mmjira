@@ -1,7 +1,7 @@
 host: localhost
 port: 8585
 hooks:
-    Test: http://192.168.99.100:8065/hooks/qqtsiqdjub8ijx696bwrzaqc1o
+    test: http://192.168.99.100:8065/hooks/877tfk5y4byizc5bifini4u1yr
 metrics: true
 debug: true
 dumpdir: dump
