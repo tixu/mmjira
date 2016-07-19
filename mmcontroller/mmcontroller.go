@@ -3,22 +3,24 @@ package mmcontroller
 import (
 	"bytes"
 	"encoding/json"
+	metrics "github.com/rcrowley/go-metrics"
 	"github.com/tixu/mmjira/jira"
 	"github.com/uber-go/zap"
-	metrics "github.com/rcrowley/go-metrics"
+	"io"
 	"net/http"
 	"strings"
 )
 
-// Mmrequest is the message that will be send to mm
-type Mmrequest struct {
+
+// Request  is the message that will be send to mm
+type Request struct {
 	Icon string `json:"icon_url"`
 	User string `json:"username"`
 	Text string `json:"text"`
 }
 
-//MMresponse is the response from MM
-type MMresponse struct {
+//Response is the response from MM
+type Response struct {
 	Project    string `json:"project"`
 	EndPoint   string `json:"endpoint"`
 	ID         string `json:"jiraid"`
@@ -27,18 +29,19 @@ type MMresponse struct {
 	Error      string `json:"error"`
 }
 
-// MMController is repsonsible to handle the communication towards MM
-type MMController struct {
-	l     zap.Logger
-	icon  string
-	name  string
-	hooks map[string]string
-	reg metrics.Registry
+//Controller is repsonsible to handle the communication towards MM
+type Controller struct {
+	l         zap.Logger
+	icon      string
+	name      string
+	converter jira.Controller
+	hooks     map[string]string
+	reg       metrics.Registry
 }
 
 // NewController is used to create a MMController
-func NewController(icon string, name string, hooks map[string]string, debug bool, reg metrics.Registry) (m *MMController, err error) {
-	m = new(MMController)
+func NewController(icon string, name string, hooks map[string]string, debug bool, reg metrics.Registry) (m *Controller, err error) {
+	m = new(Controller)
 	m.icon = icon
 	m.name = name
 	m.hooks = hooks
@@ -46,22 +49,21 @@ func NewController(icon string, name string, hooks map[string]string, debug bool
 	if debug {
 		m.l.SetLevel(zap.DebugLevel)
 	}
+	m.converter = jira.FNew()
 	m.reg = reg
 	return m, nil
-
 }
 
 //Inform send message to the right channel in MM
-func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
+func (c *Controller) Inform(update jira.IssueEvent) <-chan Response {
 
 	c.l.Info("about to inform")
-	count:=metrics.GetOrRegisterCounter("inform.request.total",c.reg)
+	count := metrics.GetOrRegisterCounter("inform.request.total", c.reg)
 	count.Inc(1)
-
-	ch := make(chan MMresponse)
+	ch := make(chan Response)
 	go func() {
-		response := MMresponse{Project: strings.ToLower(update.Project), ID: update.ID}
-		count:=metrics.GetOrRegisterCounter("inform.request."+response.Project,c.reg)
+		response := Response{Project: strings.ToLower(update.Project), ID: update.ID}
+		count := metrics.GetOrRegisterCounter("inform.request."+response.Project, c.reg)
 		count.Inc(1)
 
 		purl := c.hooks[strings.ToLower(update.Project)]
@@ -73,7 +75,7 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 		}
 		response.EndPoint = purl
 		c.l.Debug("about to post", zap.String("post url", purl))
-		buff, err := update.Render()
+		buff, err := c.converter.Convert(update)
 		if err != nil {
 			response.Error = err.Error()
 			response.Status = "1003 - not templated"
@@ -82,10 +84,8 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 			return
 		}
 
-		s2, _ := json.Marshal(&Mmrequest{User: c.name, Icon: c.icon, Text: string(buff.Bytes())})
-
+		s2, _ := json.Marshal(&Request{User: c.name, Icon: c.icon, Text: string(buff.Bytes())})
 		req, err := http.NewRequest("POST", purl, bytes.NewBuffer(s2))
-
 		req.Header.Set("Content-Type", "application/json")
 
 		client := &http.Client{}
@@ -107,22 +107,31 @@ func (c *MMController) Inform(update jira.IssueEvent) <-chan MMresponse {
 	return ch
 }
 
-//Analyse the response from mm
-func (c *MMController) Analyse(in <-chan MMresponse) {
+// Convert  converts a
+func (c *Controller) Convert(update jira.IssueEvent) (text *bytes.Buffer, err error) {
+	return c.converter.Convert(update)
+}
 
-	count:=metrics.GetOrRegisterCounter("analyse.response.total",c.reg)
+// Create an issueEvent
+func (c *Controller) Create(reader io.Reader) (i jira.IssueEvent, err error) {
+	return c.converter.Create(reader)
+}
+
+//Analyse the response from mm
+func (c *Controller) Analyse(in <-chan Response) {
+
+	count := metrics.GetOrRegisterCounter("analyse.response.total", c.reg)
 	count.Inc(1)
 
 	response := <-in
-	if (response.StatusCode != 200){
-			n := "analyse.response."+response.Project+".error"
-			count:=metrics.GetOrRegisterCounter(n,c.reg)
-			count.Inc(1)
+	if response.StatusCode != 200 {
+		n := "analyse.response." + response.Project + ".error"
+		count := metrics.GetOrRegisterCounter(n, c.reg)
+		count.Inc(1)
 	} else {
-		n := "analyse.response."+response.Project+".ok"
-		count:=metrics.GetOrRegisterCounter(n,c.reg)
+		n := "analyse.response." + response.Project + ".ok"
+		count := metrics.GetOrRegisterCounter(n, c.reg)
 		count.Inc(1)
 	}
 	c.l.Info("response received", zap.Object("response", response))
-
 }

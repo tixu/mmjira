@@ -3,20 +3,24 @@ package main
 import (
 	"fmt"
 	"strings"
-	"io/ioutil"
-	"github.com/uber-go/zap"
-	"html/template"
-	"github.com/tixu/mmjira/jira"
-	"github.com/tixu/mmjira/mmcontroller"
-	"github.com/tixu/mmjira/utils"
-
-	"net/http"
 	"strconv"
-	metrics "github.com/rcrowley/go-metrics"
+
+	"io/ioutil"
+	"html/template"
+	"net/http"
+
+  	metrics "github.com/rcrowley/go-metrics"
 	"github.com/rcrowley/go-metrics/exp"
+
 	"github.com/go-yaml/yaml"
 	"github.com/gorilla/mux"
 	"github.com/fatih/structs"
+	"github.com/uber-go/zap"
+
+	
+	"github.com/tixu/mmjira/mmcontroller"
+	"github.com/tixu/mmjira/utils"
+
 )
 
 // Page is structuring information
@@ -28,7 +32,7 @@ type Page struct {
 // MMJira is the heart of the bots
 type MMJira struct {
 	c *InstanceConfig
-	m *mmcontroller.MMController
+	m mmcontroller.MattermostBridge
 	r *mux.Router
 	l zap.Logger
 	reg metrics.Registry
@@ -55,7 +59,7 @@ func (b MMJira) getHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	t, err := template.ParseFiles("templates/info.html")
 	if err !=nil {
-		http.Error(w, err.Error(),http.StatusInternalServerError)
+   		http.Error(w, err.Error(),http.StatusInternalServerError)
 		return
 			}
 	p := Page{T:"Overview",C:cv}
@@ -102,7 +106,7 @@ func (b MMJira) postHandler(w http.ResponseWriter, r *http.Request) {
 			b.l.Info("unable to dump the request in the directory",zap.String("Directory",b.c.DumpDir))
 		}
 	}
-	issue, err := jira.New(r.Body)
+	issue, err := b.m.Create(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
 		return

@@ -2,10 +2,12 @@ package jira
 
 import (
 	"bytes"
-	"html/template"
 	"io"
 	"log"
   "strings"
+
+	"html/template"
+
 	"github.com/antonholmquist/jason"
 )
 
@@ -26,16 +28,21 @@ Summary of {{.ID}} is :
 -------------------------------------------------------------------------------
 `
 
-var t *template.Template
+//Jira controls all the  operation related to the Jira access.
+type Jira struct {
+	 t *template.Template
+}
 
-func init() {
-	t = template.New("Event")
+//FNew create  new Jira
+func FNew() (j Jira) {
+	t := template.New("Event")
 	var err error
 	t, err = t.Parse(tmpl)
 	if err != nil {
 		log.Fatal(err)
-
 	}
+	j = Jira{t:t}
+	return j
 }
 
 // IssueEvent represents the event we revceived from the JIra Incoming webhook
@@ -50,18 +57,17 @@ type IssueEvent struct {
 	Changes map[string]string
 }
 
-// Render format an IssueEvent in a simple form for mm
-func (i IssueEvent) Render() (text *bytes.Buffer, err error) {
+// Convert  format an IssueEvent in a simple form for mm
+func (j Jira) Convert(i IssueEvent)  (text *bytes.Buffer, err error) {
 	text = bytes.NewBufferString("")
-	err = t.Execute(text, i)
+	err = j.t.Execute(text, i)
 	return text, err
 }
 
-//New creates issue from a reader
-func New(reader io.Reader) (i IssueEvent, err error) {
+//Create  issue from a reader
+func (j Jira) Create(reader io.Reader) (i IssueEvent, err error) {
 	v, err := jason.NewObjectFromReader(reader)
 	if err != nil {
-
 		return i, nil
 	}
 
